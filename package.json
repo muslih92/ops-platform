@@ -1,0 +1,28 @@
+{
+  "name": "ops-workforce-platform",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "منظومة إدارة وتمكين فريق التشغيل - Operations Workforce Management & Development Platform",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "migrate": "node server/migrate.js",
+    "seed:demo": "node server/migrate.js --seed-demo",
+    "demo-users": "node server/scripts/demo-users.js",
+    "create-admin": "node server/scripts/create-admin.js",
+    "dev:server": "node --watch server/index.js",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "node server/index.js",
+    "test": "node server/scripts/smoke-test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1"
+  }
+}

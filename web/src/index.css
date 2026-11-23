@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 210 25% 97%;
+  --surface: 0 0% 100%;
+  --surface-2: 210 25% 95%;
+  --border: 214 20% 87%;
+  --fg: 215 35% 14%;
+  --muted: 215 14% 40%;
+  --primary: 204 79% 21%;
+  --primary-fg: 0 0% 100%;
+  --accent: 192 82% 29%;
+  --accent-fg: 0 0% 100%;
+  --success: 142 64% 27%;
+  --warning: 32 92% 33%;
+  --danger: 0 70% 42%;
+  --info: 204 80% 36%;
+  --success-soft: 142 60% 94%;
+  --warning-soft: 40 95% 92%;
+  --danger-soft: 0 85% 95%;
+  --info-soft: 204 85% 94%;
+  --ring: 192 82% 35%;
+  --sidebar: 206 62% 14%;
+  --sidebar-fg: 205 30% 94%;
+  --sidebar-muted: 205 18% 68%;
+  --sidebar-active: 192 70% 30%;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 213 35% 8%;
+  --surface: 213 30% 12%;
+  --surface-2: 213 26% 16%;
+  --border: 213 20% 24%;
+  --fg: 210 25% 93%;
+  --muted: 213 14% 68%;
+  --primary: 195 70% 52%;
+  --primary-fg: 213 40% 8%;
+  --accent: 186 70% 45%;
+  --accent-fg: 213 40% 8%;
+  --success: 142 55% 55%;
+  --warning: 38 92% 60%;
+  --danger: 0 80% 66%;
+  --info: 204 85% 66%;
+  --success-soft: 142 40% 16%;
+  --warning-soft: 35 50% 16%;
+  --danger-soft: 0 45% 18%;
+  --info-soft: 204 45% 18%;
+  --ring: 190 80% 55%;
+  --sidebar: 213 35% 10%;
+  --sidebar-fg: 210 25% 92%;
+  --sidebar-muted: 213 14% 64%;
+  --sidebar-active: 192 60% 26%;
+  color-scheme: dark;
+}
+
+html, body { background: hsl(var(--bg)); color: hsl(var(--fg)); }
+body { font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+*:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 6px; }
+input, select, textarea, button { font: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@layer components {
+  .card { @apply rounded-lg border border-border bg-surface; }
+  .input {
+    @apply w-full min-h-[44px] rounded-md border border-border bg-surface px-3 py-2 text-fg placeholder:text-muted/70
+      focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .label { @apply mb-1 block text-sm font-medium text-fg; }
+  .th { @apply px-3 py-2.5 text-start text-xs font-semibold text-muted whitespace-nowrap; }
+  .td { @apply px-3 py-2.5 align-middle text-sm; }
+}
+
+/* Print / PDF */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  .no-print { display: none !important; }
+  body { background: #fff !important; color: #000 !important; font-size: 11px; }
+  .print-area { box-shadow: none !important; border: none !important; }
+  .print-only { display: block !important; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  aside, header { display: none !important; }
+  main { padding: 0 !important; }
+}
+.print-only { display: none; }

@@ -1,0 +1,7 @@
+# يبني صورة التطبيق من الكود المحلي بدل سحبها من GitHub
+services:
+  app:
+    build: .
+    image: ops-platform:local
+    pull_policy: build
+    env_file: [{ path: .env, required: false }]
