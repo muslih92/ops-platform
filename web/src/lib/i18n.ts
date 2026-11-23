@@ -26,6 +26,12 @@ const ar = {
     integration_status: { not_configured: 'غير مهيأ', configured: 'مهيأ', connected: 'متصل', last_failed: 'فشل آخر اتصال' },
     capabilities: { reports: 'التقارير', data: 'البيانات والتحليل', training: 'التدريب ونقل المعرفة', coordination: 'التنسيق', problem_solving: 'حل المشكلات' },
     weekday: { 0: 'الأحد', 1: 'الإثنين', 2: 'الثلاثاء', 3: 'الأربعاء', 4: 'الخميس', 5: 'الجمعة', 6: 'السبت' } as Record<number, string>,
+    rotation_status: { pending: 'بانتظار الاعتماد', approved: 'معتمد', rejected: 'مرفوض', cancelled: 'ملغي' },
+    transfer_kind: { permanent: 'دائم', temporary: 'مؤقت' },
+    coverage_method: { overtime: 'عمل إضافي', day_compensation: 'تعويض أيام' },
+    overtime_cause: { coverage: 'تغطية زميل', breakdown: 'عطل', pipe_burst: 'انكسار خط', emergency: 'طارئ تشغيلي', planned_work: 'أعمال مجدولة', other: 'أخرى' },
+    shift_kind: { D: 'نهاري', N: 'ليلي', O: 'راحة' },
+    annual_leave_days: { 30: '30 يومًا', 33: '33 يومًا' } as Record<number, string>,
     audit_action: { insert: 'إضافة', update: 'تعديل', delete: 'حذف', archive: 'أرشفة', restore: 'استعادة', coverage_override: 'تجاوز تحذير التغطية' },
   },
   tables: {
@@ -36,6 +42,8 @@ const ar = {
     shift_handover_reports: 'تسليم الورديات', handover_items: 'بنود التسليم', leave_types: 'أنواع الإجازات', leave_requests: 'طلبات الإجازة',
     training_courses: 'الدورات', training_enrollments: 'المرشحون للدورات', development_plans: 'خطط التطوير', improvement_ideas: 'المبادرات والتحسينات',
     review_criteria: 'معايير التقييم', rating_levels: 'مستويات التقييم', performance_reviews: 'تقييمات الأداء', performance_review_scores: 'درجات التقييم',
+    shift_groups: 'مجموعات المناوبة', shift_swaps: 'تبديل الورديات', group_transfers: 'نقل الموظفين بين المجموعات',
+    coverage_requests: 'طلبات التغطية', overtime_entries: 'العمل الإضافي', leave_balances: 'أرصدة الإجازة السنوية',
     integration_configs: 'إعدادات التكامل', integration_records: 'سجلات التكامل', system_settings: 'إعدادات النظام',
   } as Record<string, string>,
 };

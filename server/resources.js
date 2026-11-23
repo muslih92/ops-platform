@@ -37,12 +37,12 @@ export const resources = {
     table: 'employees', view: 'v_employees',
     write: ['employee_number', 'full_name', 'job_title', 'department_id', 'primary_site_id', 'line_id', 'shift_id', 'manager_id', 'hire_date',
       'status', 'qualifications', 'certifications', 'previous_experience', 'strengths', 'interests', 'desired_skills', 'capabilities',
-      'specialization_wishes', 'supervisor_recommendation'],
-    search: ['full_name', 'employee_number', 'site_name', 'job_title'], filters: ['primary_site_id', 'shift_id', 'line_id', 'status', 'department_id', 'id', 'is_demo'],
-    sort: ['full_name', 'employee_number', 'site_name', 'shift_name', 'hire_date', 'status'], defaultSort: 'employee_number', archivable: true,
+      'specialization_wishes', 'supervisor_recommendation', 'group_id', 'annual_leave_days'],
+    search: ['full_name', 'employee_number', 'site_name', 'job_title'], filters: ['primary_site_id', 'shift_id', 'line_id', 'status', 'department_id', 'id', 'is_demo', 'group_id'],
+    sort: ['full_name', 'employee_number', 'site_name', 'shift_name', 'hire_date', 'status', 'group_code'], defaultSort: 'employee_number', archivable: true,
   },
   employee_private: { table: 'employee_private', key: 'employee_id', write: ['employee_id', 'phone', 'email', 'admin_notes'], filters: ['employee_id'], sort: ['employee_id'], defaultSort: 'employee_id' },
-  employee_directory: { view: 'employee_directory', readOnly: true, search: ['full_name', 'employee_number'], filters: ['primary_site_id', 'shift_id', 'status', 'id'], sort: ['full_name', 'employee_number'], defaultSort: 'full_name' },
+  employee_directory: { view: 'employee_directory', readOnly: true, search: ['full_name', 'employee_number'], filters: ['primary_site_id', 'shift_id', 'status', 'id', 'group_id'], sort: ['full_name', 'employee_number'], defaultSort: 'full_name' },
   user_directory: { view: 'user_directory', readOnly: true, search: ['full_name'], filters: ['id', 'employee_id'], sort: ['full_name'], defaultSort: 'full_name' },
   skill_domains: { table: 'skill_domains', write: ['name', 'description', 'sort_order'], search: ['name'], sort: ['sort_order', 'name'], defaultSort: 'sort_order', archivable: true },
   skills: {
@@ -130,4 +130,34 @@ export const resources = {
   },
   audit_logs: { view: 'v_audit_logs', readOnly: true, search: ['table_name', 'record_id', 'actor_name', 'action', 'reason'], filters: ['table_name', 'action', 'actor_id', 'record_id', 'created_at'], sort: ['created_at'], defaultSort: '-created_at' },
   system_settings: { table: 'system_settings', key: 'key', write: ['key', 'value'], sort: ['key'], defaultSort: 'key' },
+  // ---- 12h rotation (groups A/B/C/D), swaps, coverage, transfers, overtime, leave balances
+  shift_groups: {
+    table: 'shift_groups', view: 'v_shift_groups', write: ['code', 'name', 'color', 'cycle_start_date', 'notes'],
+    search: ['code', 'name'], sort: ['code', 'name'], defaultSort: 'code', archivable: true,
+  },
+  shift_swaps: {
+    table: 'shift_swaps', view: 'v_shift_swaps', write: ['group_a_id', 'group_b_id', 'a_start', 'a_end', 'b_start', 'b_end', 'reason'],
+    search: ['reason', 'group_a_code', 'group_b_code', 'created_by_name'], filters: ['status', 'group_a_id', 'group_b_id', 'a_start', 'id'],
+    sort: ['a_start', 'created_at', 'status'], defaultSort: '-created_at', noUpdate: true,
+  },
+  group_transfers: {
+    table: 'group_transfers', view: 'v_group_transfers', write: ['employee_id', 'to_group_id', 'kind', 'start_date', 'end_date', 'reason'],
+    search: ['employee_name', 'employee_number', 'reason'], filters: ['status', 'employee_id', 'kind', 'to_group_id', 'from_group_id', 'site_id', 'id'],
+    sort: ['start_date', 'created_at', 'employee_name', 'status'], defaultSort: '-created_at', noUpdate: true,
+  },
+  coverage_requests: {
+    table: 'coverage_requests', view: 'v_coverage_requests',
+    write: ['work_date', 'shift_kind', 'group_id', 'absent_employee_id', 'covering_employee_id', 'method', 'hours', 'comp_days', 'comp_date', 'site_id', 'reason'],
+    search: ['covering_name', 'absent_name', 'reason', 'site_name'], filters: ['status', 'method', 'covering_employee_id', 'absent_employee_id', 'work_date', 'site_id', 'group_id', 'id'],
+    sort: ['work_date', 'created_at', 'covering_name', 'status'], defaultSort: '-work_date', noUpdate: true,
+  },
+  overtime_entries: {
+    table: 'overtime_entries', view: 'v_overtime_entries', write: ['employee_id', 'work_date', 'hours', 'cause', 'site_id', 'description', 'reference_no'],
+    search: ['employee_name', 'employee_number', 'description', 'reference_no', 'site_name'], filters: ['status', 'cause', 'employee_id', 'site_id', 'work_date', 'coverage_request_id', 'id'],
+    sort: ['work_date', 'created_at', 'employee_name', 'hours', 'status'], defaultSort: '-work_date', noUpdate: true,
+  },
+  leave_balances: {
+    table: 'leave_balances', view: 'v_leave_balances', write: ['employee_id', 'year', 'entitlement', 'carried_over', 'adjustment', 'notes'],
+    search: ['employee_name', 'employee_number'], filters: ['employee_id', 'year'], sort: ['year', 'employee_name'], defaultSort: '-year',
+  },
 };

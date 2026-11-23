@@ -12,7 +12,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { FormModal, type FieldDef } from '@/components/EntityForm';
 import { Alert, Badge, Button, DemoBadge, Modal, PageHeader } from '@/components/ui';
 
-export function employeeFields(o: { sites: any[]; lines: any[]; shifts: any[]; depts: any[]; managers: any[] }): FieldDef[] {
+export function employeeFields(o: { sites: any[]; lines: any[]; shifts: any[]; depts: any[]; managers: any[]; groups: any[] }): FieldDef[] {
   return [
     { name: 'employee_number', label: 'الرقم الوظيفي', required: true, maxLength: 40 },
     { name: 'full_name', label: 'الاسم الكامل', required: true, maxLength: 150 },
@@ -21,6 +21,8 @@ export function employeeFields(o: { sites: any[]; lines: any[]; shifts: any[]; d
     { name: 'primary_site_id', label: 'الموقع الأساسي', type: 'select', options: o.sites, required: true },
     { name: 'line_id', label: 'الخط', type: 'select', options: o.lines },
     { name: 'shift_id', label: 'الوردية', type: 'select', options: o.shifts },
+    { name: 'group_id', label: 'مجموعة المناوبة (A/B/C/D)', type: 'select', options: o.groups, hint: 'للنقل لاحقًا استخدم «طلب نقل» في صفحة المناوبات' },
+    { name: 'annual_leave_days', label: 'رصيد الإجازة السنوي', type: 'select', required: true, options: [{ value: '30', label: '30 يومًا' }, { value: '33', label: '33 يومًا' }] },
     { name: 'manager_id', label: 'المدير المباشر', type: 'select', options: o.managers },
     { name: 'hire_date', label: 'تاريخ التعيين', type: 'date' },
     { name: 'status', label: 'الحالة الوظيفية', type: 'select', options: options('employee_status'), required: true },
@@ -36,7 +38,9 @@ export function useEmployeeFieldOptions(siteId?: string) {
   const shifts = useOptions('shifts', { label: (r) => `${r.name} – ${r.site_name || 'عام'}`, sort: 'site_name' });
   const depts = useOptions('departments');
   const managers = useOptions('employee_directory', { label: (r) => `${r.full_name} – ${r.employee_number}`, sort: 'full_name' });
+  const groups = useOptions('shift_groups', { label: (r) => r.name, sort: 'code' });
   return {
+    groups: groups.options,
     sites: sites.options,
     lines: siteId ? lines.options.filter((_, i) => lines.rows[i].site_id === siteId) : lines.options,
     shifts: siteId ? shifts.options.filter((_, i) => !shifts.rows[i].site_id || shifts.rows[i].site_id === siteId) : shifts.options,
@@ -81,6 +85,7 @@ export default function Employees() {
     { key: 'job_title', header: 'المسمى' },
     { key: 'site_name', header: 'الموقع', sortKey: 'site_name' },
     { key: 'shift_name', header: 'الوردية', sortKey: 'shift_name' },
+    { key: 'group_code', header: 'المجموعة', sortKey: 'group_code', render: (r) => r.group_code || '—' },
     { key: 'status', header: 'الحالة', sortKey: 'status', render: (r) => <Badge tone={r.status === 'active' ? 'success' : r.status === 'on_leave' ? 'warning' : 'neutral'}>{label('employee_status', r.status)}</Badge> },
   ];
 
@@ -117,6 +122,7 @@ export default function Employees() {
         filters={[
           { key: 'primary_site_id', label: 'الموقع', options: sites.options },
           { key: 'shift_id', label: 'الوردية', options: shiftsOpt.options },
+          { key: 'group_id', label: 'المجموعة', options: fo.groups },
           { key: 'status', label: 'الحالة', options: options('employee_status') },
           { key: 'is_demo', label: 'بيانات تجريبية', type: 'bool' },
         ]}
@@ -124,7 +130,7 @@ export default function Employees() {
         empty={{ title: 'لا يوجد موظفون بعد', description: 'أضف موظفًا أو استورد قائمة من ملف Excel/CSV.', action: canWrite ? <Button onClick={() => setCreating(true)}>إضافة موظف</Button> : undefined }} />
 
       <FormModal open={creating} onClose={() => setCreating(false)} title="إضافة موظف" size="lg"
-        fields={employeeFields(fo)} initial={{ status: 'active' }}
+        fields={employeeFields(fo)} initial={{ status: 'active', annual_leave_days: '30' }}
         onSubmit={(p) => create.mutateAsync(p)}>
         {(v) => { if (v.primary_site_id !== siteForForm) setTimeout(() => setSiteForForm(v.primary_site_id || undefined)); return null; }}
       </FormModal>

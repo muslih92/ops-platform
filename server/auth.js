@@ -75,7 +75,7 @@ export async function loadMe(userId) {
       `select distinct p.key from user_roles ur join roles r on r.key = ur.role join role_permissions rp on rp.role_id = r.id
        join permissions p on p.id = rp.permission_id where ur.user_id = app.uid()`)).rows.map((r) => r.key);
     const employee = u.employee_id
-      ? (await c.query(`select id, employee_number, full_name, job_title, primary_site_id, shift_id, site_name, shift_name from v_employees where id = $1`, [u.employee_id])).rows[0] || null
+      ? (await c.query(`select id, employee_number, full_name, job_title, primary_site_id, shift_id, site_name, shift_name, group_id, group_code from v_employees where id = $1`, [u.employee_id])).rows[0] || null
       : null;
     const supervisedSites = (await c.query(`select unnest(app.supervised_site_ids()) id`)).rows.map((r) => r.id);
     const unread = (await c.query(`select count(*)::int n from notifications where user_id = app.uid() and read_at is null`)).rows[0].n;

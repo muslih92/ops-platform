@@ -68,6 +68,8 @@ function InfoTab({ e, canEdit }: { e: any; canEdit: boolean }) {
           <KV label="الموقع الأساسي">{e.site_name}</KV>
           <KV label="الخط">{e.line_name}</KV>
           <KV label="الوردية">{e.shift_name}</KV>
+          <KV label="مجموعة المناوبة">{e.group_name}</KV>
+          <KV label="رصيد الإجازة السنوي"><span className="num">{e.annual_leave_days}</span> يومًا</KV>
           <KV label="المدير المباشر">{e.manager_name}</KV>
           <KV label="تاريخ التعيين">{fmtDate(e.hire_date)}</KV>
           <KV label="الحالة">{label('employee_status', e.status)}</KV>

@@ -15,6 +15,7 @@ const Employees = lazy(() => import('./pages/Employees'));
 const EmployeeProfile = lazy(() => import('./pages/EmployeeProfile'));
 const Sites = lazy(() => import('./pages/Sites'));
 const Shifts = lazy(() => import('./pages/Shifts'));
+const Rotation = lazy(() => import('./pages/Rotation'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const TaskDetail = lazy(() => import('./pages/TaskDetail'));
 const Handover = lazy(() => import('./pages/Handover'));
@@ -62,6 +63,7 @@ function Root() {
           <Route path="me" element={<MyProfile />} />
           <Route path="sites" element={<Guard allow={(a) => a.isManager}><Sites /></Guard>} />
           <Route path="shifts" element={<Guard allow={operational}><Shifts /></Guard>} />
+          <Route path="rotation" element={<Guard allow={operational}><Rotation /></Guard>} />
           <Route path="tasks" element={<Guard allow={operational}><Tasks /></Guard>} />
           <Route path="tasks/:id" element={<Guard allow={operational}><TaskDetail /></Guard>} />
           <Route path="handover" element={<Guard allow={operational}><Handover /></Guard>} />
