@@ -299,7 +299,10 @@ publicRouter.get('/branding', async (_req, res, next) => {
     const { rows } = await pool.query(`select key, value from system_settings where key in ('platform_name','platform_name_en','org_name','logo_path')`);
     const s = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     const hasAdmin = (await pool.query(`select 1 from user_roles where role = 'system_admin' limit 1`)).rowCount > 0;
-    res.json({ ...s, setup_required: !hasAdmin, signup_enabled: process.env.ALLOW_SIGNUP !== 'false' });
+    const signupEnabled = process.env.ALLOW_SIGNUP !== 'false';
+    res.json({ ...s, setup_required: !hasAdmin, signup_enabled: signupEnabled,
+      // the first account can only become admin through the form when both switches allow it
+      setup_via_signup: !hasAdmin && signupEnabled && process.env.FIRST_USER_IS_ADMIN !== 'false' });
   } catch (e) { next(e); }
 });
 publicRouter.get('/logo', async (_req, res, next) => {

@@ -14,7 +14,8 @@ export default function Login() {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const setup = b.data?.setup_required;
+  const setup = b.data?.setup_required && b.data?.setup_via_signup;
+  const setupConsole = b.data?.setup_required && !b.data?.setup_via_signup;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +47,13 @@ export default function Login() {
             <Alert tone="info" title="الإعداد الأول للمنصة" className="mb-4">
               لا يوجد مدير نظام بعد. أول حساب يُنشأ سيحصل تلقائيًا على دور <b>مدير النظام</b>، وكل حساب بعده يبقى بانتظار التفعيل حتى يمنحه المدير دورًا.
               {mode === 'login' && <button className="ms-1 font-semibold text-accent underline" onClick={() => setMode('signup')}>إنشاء حساب المدير</button>}
+            </Alert>
+          )}
+          {setupConsole && (
+            <Alert tone="info" title="الإعداد الأول للمنصة" className="mb-4">
+              لا يوجد مدير نظام بعد. يُنشأ المدير الأول من طرفية الخادم (حاوية التطبيق) بالأمر:
+              <code dir="ltr" className="mt-1 block break-all text-xs">node server/scripts/create-admin.js email@example.com "الاسم"</code>
+              ثم سجّل الدخول هنا بالبريد وكلمة المرور.
             </Alert>
           )}
           {error && <Alert tone="danger" className="mb-4">{error}</Alert>}
