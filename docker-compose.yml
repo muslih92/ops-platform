@@ -1,5 +1,6 @@
 # نشر بصورة جاهزة من GitHub (مناسب لـ Hostinger Docker Manager: «الكتابة من عنوان URL»).
 # عيّن DB_PASSWORD في متغيرات البيئة. اختياري: APP_PORT (الافتراضي 3100)، COOKIE_SECURE (false حتى يتوفر HTTPS).
+# التحديث تلقائي: كل دفع إلى main يُبنى صورة جديدة وتسحبها خدمة updater خلال 5 دقائق.
 # بعد التشغيل أنشئ المدير الأول من طرفية حاوية app:
 #   node server/scripts/create-admin.js admin@your-org.sa "اسم المدير"
 # للبناء محليًا من الكود: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
@@ -34,6 +35,18 @@ services:
       - uploads:/data/uploads
     ports:
       - "${APP_PORT:-3100}:3000"
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.scope=ops-platform
+    restart: unless-stopped
+  # تحديث تلقائي: يفحص كل 5 دقائق ويحدّث حاوية app فقط (لا يلمس db ولا أي مشروع آخر)
+  updater:
+    image: nickfedor/watchtower:latest
+    command: --label-enable --scope ops-platform --interval 300 --cleanup
+    labels:
+      - com.centurylinklabs.watchtower.scope=ops-platform
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 volumes:
   pgdata:
