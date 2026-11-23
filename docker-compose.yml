@@ -1,5 +1,5 @@
 # نشر بصورة جاهزة من GitHub (مناسب لـ Hostinger Docker Manager: «الكتابة من عنوان URL»).
-# المتغيرات المطلوبة: DB_PASSWORD. اختياري: APP_PORT (الافتراضي 3100)، COOKIE_SECURE (false حتى يتوفر HTTPS).
+# عيّن DB_PASSWORD في متغيرات البيئة. اختياري: APP_PORT (الافتراضي 3100)، COOKIE_SECURE (false حتى يتوفر HTTPS).
 # بعد التشغيل أنشئ المدير الأول من طرفية حاوية app:
 #   node server/scripts/create-admin.js admin@your-org.sa "اسم المدير"
 # للبناء محليًا من الكود: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
@@ -9,27 +9,31 @@ services:
     environment:
       POSTGRES_DB: ops
       POSTGRES_USER: ops_owner
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
-    volumes: [pgdata:/var/lib/postgresql/data]
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ChangeMe2026ops}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ops_owner -d ops"]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      retries: 20
     restart: unless-stopped
   app:
     image: ghcr.io/muslih92/ops-platform:latest
-    pull_policy: always
     depends_on:
-      db: { condition: service_healthy }
+      db:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ops_owner:${DB_PASSWORD:?set DB_PASSWORD}@db:5432/ops
+      DATABASE_URL: postgres://ops_owner:${DB_PASSWORD:-ChangeMe2026ops}@db:5432/ops
       NODE_ENV: production
       ALLOW_SIGNUP: "false"
       FIRST_USER_IS_ADMIN: "false"
       TRUST_PROXY: "1"
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-    volumes: [uploads:/data/uploads]
-    ports: ["${APP_PORT:-3100}:3000"]
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "${APP_PORT:-3100}:3000"
     restart: unless-stopped
 volumes:
   pgdata:
