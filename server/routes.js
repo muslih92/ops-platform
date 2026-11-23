@@ -45,6 +45,12 @@ const RPC = {
   set_recommendation: { args: ['employee_id:uuid', 'text:text'], returns: 'scalar' },
   plan_employee_comment: { args: ['plan_id:uuid', 'comment:text'], returns: 'scalar' },
   review_acknowledge: { args: ['review_id:uuid', 'comment:text'], returns: 'scalar' },
+  rotation_calendar: { args: ['from:date', 'to:date'], returns: 'rows' },
+  duty_roster: { args: ['date:date'], returns: 'rows' },
+  employee_schedule: { args: ['employee_id:uuid', 'from:date', 'to:date'], returns: 'rows' },
+  rotation_decide: { args: ['kind:text', 'id:uuid', 'decision:rotation_status', 'note:text'], returns: 'scalar' },
+  leave_balance_report: { args: ['year:int', 'site_id:uuid'], returns: 'rows' },
+  close_leave_year: { args: ['year:int'], returns: 'scalar' },
 };
 
 api.post('/rpc/:fn', async (req, res, next) => {
@@ -220,11 +226,15 @@ api.post('/settings/logo', logoUpload.single('file'), async (req, res, next) => 
 
 api.put('/settings', async (req, res, next) => {
   try {
-    const allowed = ['platform_name', 'platform_name_en', 'org_name', 'org_info', 'default_timezone', 'qualified_level'];
+    const allowed = ['platform_name', 'platform_name_en', 'org_name', 'org_info', 'default_timezone', 'qualified_level', 'rotation'];
     await withUser(req.user.id, async (c) => {
       for (const [k, v] of Object.entries(req.body || {})) {
         if (!allowed.includes(k)) continue;
         if (k === 'platform_name' && (typeof v !== 'string' || v.trim().length < 3)) throw new HttpError(400, 'اسم المنصة مطلوب');
+        if (k === 'rotation') {
+          const ok = v && typeof v === 'object' && /^[DNO]{2,28}$/.test(v.pattern) && /^\d{2}:\d{2}$/.test(v.day_start) && /^\d{2}:\d{2}$/.test(v.night_start);
+          if (!ok) throw new HttpError(400, 'إعدادات الدورة غير صحيحة');
+        }
         const n = (await c.query(`insert into system_settings(key, value, updated_by) values ($1, $2::jsonb, app.uid())
                                   on conflict (key) do update set value = excluded.value, updated_at = now(), updated_by = app.uid()`, [k, JSON.stringify(v)])).rowCount;
         if (!n) throw new HttpError(403, 'ليست لديك صلاحية تعديل الإعدادات');

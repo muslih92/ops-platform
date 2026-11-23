@@ -7,6 +7,9 @@ import { useAction, useEmployeesDir, useList, useOne, useOptions, useRpc, useSit
 import { label, options } from '@/lib/i18n';
 import { addDays, daysBetween, fmtDate, fmtDateTime, todayISO } from '@/lib/format';
 import { DataTable } from '@/components/DataTable';
+import { FormModal } from '@/components/EntityForm';
+import { ConfirmDialog, cx, EmptyState } from '@/components/ui';
+import { exportXlsx } from '@/lib/export';
 import { Alert, Badge, Button, Card, DemoBadge, Field, IconButton, Input, KV, Modal, PageHeader, Select, Spinner, Tabs, Textarea } from '@/components/ui';
 import { LeaveStatus } from '@/components/StatusBadges';
 import { Attachments } from '@/components/Attachments';
@@ -71,6 +74,7 @@ function NewLeaveModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         <Field label="إلى تاريخ" required hint={valid ? `المدة ${daysBetween(v.start_date, v.end_date) + 1} يوم` : undefined}>{(id) => <Input id={id} type="date" min={v.start_date} value={v.end_date} onChange={(e) => setV({ ...v, end_date: e.target.value })} />}</Field>
         <Field label="ملاحظات" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} />}</Field>
       </div>
+      {v.employee_id && types.rows.find((t: any) => t.id === v.leave_type_id)?.code === 'ANNUAL' && <BalanceHint employeeId={v.employee_id} year={Number(v.start_date.slice(0, 4))} days={valid ? daysBetween(v.start_date, v.end_date) + 1 : 0} />}
       {valid && v.employee_id && <div className="mt-3"><ImpactPanel impact={impact.data} loading={impact.isLoading} /></div>}
     </Modal>
   );
@@ -198,7 +202,122 @@ function LeaveCalendar({ onOpen }: { onOpen: (id: string) => void }) {
   );
 }
 
-type View = 'mine' | 'review' | 'all' | 'calendar';
+function BalanceHint({ employeeId, year, days }: { employeeId: string; year: number; days: number }) {
+  const q = useRpc<any[]>('leave_balance_report', { year });
+  const b = (q.data ?? []).find((r) => r.employee_id === employeeId);
+  if (!b) return null;
+  const after = Number(b.remaining) - Number(b.pending) - days;
+  return (
+    <Alert tone={after < 0 ? 'danger' : 'info'} className="mt-3" title="رصيد الإجازة السنوية">
+      الرصيد المتبقي لسنة <span className="num">{year}</span>: <b className="num">{b.remaining}</b> يوم
+      {Number(b.pending) > 0 && <> (منها <span className="num">{b.pending}</span> يوم في طلبات قيد المراجعة)</>}
+      {days > 0 && <> · بعد هذا الطلب: <b className="num">{after}</b> يوم</>}
+      {after < 0 && <div className="mt-1 font-semibold">مدة الطلب أكبر من الرصيد المتاح.</div>}
+      {!b.has_record && <div className="mt-1 text-xs opacity-80">الرصيد تقديري (لم يُدخل رصيد هذه السنة بعد).</div>}
+    </Alert>
+  );
+}
+
+function LeaveBalances() {
+  const auth = useAuth();
+  const sites = useSites();
+  const thisYear = Number(todayISO().slice(0, 4));
+  const [year, setYear] = useState(thisYear);
+  const [site, setSite] = useState('');
+  const [onlyAbove, setOnlyAbove] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [closing, setClosing] = useState(false);
+  const q = useRpc<any[]>('leave_balance_report', { year, site_id: site || null });
+  const rows = (q.data ?? []).filter((r) => !onlyAbove || Number(r.above_cap) > 0);
+  const above = (q.data ?? []).filter((r) => Number(r.above_cap) > 0);
+  const canEdit = auth.can('leave.balances');
+  const canClose = canEdit && auth.hasRole('system_admin', 'operations_manager');
+  const month = Number(todayISO().slice(5, 7));
+  const save = useAction(async (p: Record<string, any>) => {
+    const ex = await api.list('leave_balances', { filters: { employee_id: editing.employee_id, year } });
+    const body = { entitlement: Number(p.entitlement), carried_over: Number(p.carried_over || 0), adjustment: Number(p.adjustment || 0), notes: p.notes };
+    return ex.rows[0] ? api.update('leave_balances', ex.rows[0].id, body) : api.create('leave_balances', { ...body, employee_id: editing.employee_id, year });
+  }, { success: 'تم حفظ الرصيد' });
+  const [closed, setClosed] = useState<any>(null);
+  const close = useAction(() => api.rpc<any>('close_leave_year', { year }), {
+    onSuccess: (r: any) => { setClosing(false); setClosed(r); },
+  });
+  const exportRows = () => exportXlsx(`leave-balances-${year}`, [
+    { header: 'الرقم الوظيفي', value: (r: any) => r.employee_number }, { header: 'الاسم', value: (r: any) => r.full_name },
+    { header: 'الموقع', value: (r: any) => r.site_name }, { header: 'المجموعة', value: (r: any) => r.group_code },
+    { header: 'الاستحقاق', value: (r: any) => Number(r.entitlement) }, { header: 'المرحل', value: (r: any) => Number(r.carried_over) },
+    { header: 'تسوية', value: (r: any) => Number(r.adjustment) }, { header: 'المستخدم', value: (r: any) => Number(r.used) },
+    { header: 'قيد المراجعة', value: (r: any) => Number(r.pending) }, { header: 'المتبقي', value: (r: any) => Number(r.remaining) },
+    { header: 'فوق حد الترحيل (10)', value: (r: any) => Number(r.above_cap) },
+    { header: 'أيام تعويض مكتسبة', value: (r: any) => Number(r.comp_earned) }, { header: 'أيام تعويض مستخدمة', value: (r: any) => Number(r.comp_used) },
+    { header: 'الرصيد', value: (r: any) => (r.has_record ? 'مُدخل' : 'تقديري') },
+  ], rows, { title: `أرصدة الإجازة السنوية ${year}`, filters: onlyAbove ? 'أكثر من 10 أيام' : '', preparedBy: auth.me?.user.full_name || '' });
+  return (
+    <div className="space-y-3">
+      <div className="card no-print flex flex-wrap items-end gap-3 p-3">
+        <div><label className="label text-xs" htmlFor="lb-y">السنة</label><Select id="lb-y" value={String(year)} onChange={(e) => setYear(Number(e.target.value))} options={[thisYear - 1, thisYear, thisYear + 1].map((y) => ({ value: String(y), label: String(y) }))} /></div>
+        <div><label className="label text-xs" htmlFor="lb-s">الموقع</label><Select id="lb-s" value={site} onChange={(e) => setSite(e.target.value)} options={sites.options} placeholder="كل المواقع" /></div>
+        <label className="inline-flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={onlyAbove} onChange={(e) => setOnlyAbove(e.target.checked)} /> أكثر من 10 أيام فقط</label>
+        <div className="flex-1" />
+        <Button variant="secondary" onClick={exportRows}>تصدير Excel</Button>
+        {canClose && <Button variant="secondary" onClick={() => setClosing(true)}>ترحيل الأرصدة إلى {year + 1}</Button>}
+      </div>
+      {above.length > 0 && (
+        <Alert tone={month >= 10 && year === thisYear ? 'danger' : 'warning'} title="أرصدة تتجاوز حد الترحيل">
+          <b className="num">{above.length}</b> موظف لديهم رصيد أكثر من 10 أيام (مجموع الزيادة <b className="num">{above.reduce((a, r) => a + Number(r.above_cap), 0)}</b> يوم).
+          الحد الأقصى للترحيل 10 أيام، والهدف أن يكون الرصيد 10 أيام أو أقل (والأفضل صفر) في نهاية السنة. ما يزيد على 10 لا يُرحَّل.
+        </Alert>
+      )}
+      {closed && <Alert tone="success" title="تم الترحيل">رُحّلت أرصدة <b className="num">{closed.employees}</b> موظف إلى سنة <span className="num">{closed.year}</span> (بحد أقصى 10 أيام لكل موظف). الأيام غير المرحّلة: <b className="num">{closed.days_over_cap}</b>.</Alert>}
+      <div className="card overflow-x-auto">
+        {q.isLoading ? <Spinner /> : rows.length === 0 ? <EmptyState title="لا توجد بيانات" /> : (
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="bg-surface-2"><tr>
+              <th className="th">الموظف</th><th className="th">المجموعة</th><th className="th text-center">الاستحقاق</th><th className="th text-center">المرحّل</th>
+              <th className="th text-center">تسوية</th><th className="th text-center">المستخدم</th><th className="th text-center">قيد المراجعة</th>
+              <th className="th text-center">المتبقي</th><th className="th text-center">تعويض أيام</th>{canEdit && <th className="th" />}
+            </tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr key={r.employee_id} className="border-t border-border">
+                <td className="td"><div className="font-medium">{r.full_name}</div><div className="text-xs text-muted">{r.employee_number} · {r.site_name || '—'}</div></td>
+                <td className="td">{r.group_code || '—'}</td>
+                <td className="td text-center num">{r.entitlement}</td>
+                <td className="td text-center num">{Number(r.carried_over)}</td>
+                <td className="td text-center num">{Number(r.adjustment)}</td>
+                <td className="td text-center num">{Number(r.used)}</td>
+                <td className="td text-center num">{Number(r.pending) || '—'}</td>
+                <td className="td text-center">
+                  <span className={cx('num rounded px-2 py-0.5 font-bold', Number(r.above_cap) > 0 ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success')}>{Number(r.remaining)}</span>
+                  {Number(r.above_cap) > 0 && <div className="text-[11px] text-danger">+<span className="num">{Number(r.above_cap)}</span> فوق الحد</div>}
+                  {!r.has_record && <div className="text-[11px] text-muted">تقديري</div>}
+                </td>
+                <td className="td text-center text-xs"><span className="num">{Number(r.comp_earned)}</span> مكتسب / <span className="num">{Number(r.comp_used)}</span> مستخدم</td>
+                {canEdit && <td className="td"><Button size="sm" variant="ghost" onClick={() => setEditing(r)}>تعديل</Button></td>}
+              </tr>))}</tbody>
+          </table>
+        )}
+        <div className="border-t border-border p-3 text-xs text-muted">
+          المتبقي = الاستحقاق (30 أو 33) + المرحّل من السنة السابقة (حد أقصى 10) + التسوية − الإجازات الاعتيادية المعتمدة في السنة (بالأيام التقويمية).
+          «تقديري» يعني أن رصيد السنة لم يُدخل بعد، فيُحسب من استحقاق الموظف فقط. التنبيهات الشهرية من أكتوبر تُرسل للأرصدة المُدخلة فقط.
+        </div>
+      </div>
+      <FormModal open={!!editing} onClose={() => setEditing(null)} title={`رصيد ${editing?.full_name ?? ''} لسنة ${year}`}
+        initial={editing ? { entitlement: String(editing.entitlement), carried_over: Number(editing.carried_over), adjustment: Number(editing.adjustment) } : null}
+        onSubmit={(p) => save.mutateAsync(p)}
+        fields={[
+          { name: 'entitlement', label: 'الاستحقاق السنوي', type: 'select', required: true, options: [{ value: '30', label: '30 يومًا' }, { value: '33', label: '33 يومًا' }] },
+          { name: 'carried_over', label: 'المرحّل من السنة السابقة', type: 'number', min: 0, max: 10, hint: 'الحد الأقصى 10 أيام' },
+          { name: 'adjustment', label: 'تسوية (+ أو −)', type: 'number', min: -60, max: 60, hint: 'مثل أيام مستخدمة قبل بدء العمل بالمنصة (بالسالب)' },
+          { name: 'notes', label: 'ملاحظات', type: 'textarea' },
+        ]} />
+      <ConfirmDialog open={closing} onClose={() => setClosing(false)} confirmLabel="ترحيل" loading={close.isPending} onConfirm={() => close.mutate()}
+        title={`ترحيل أرصدة ${year} إلى ${year + 1}`}
+        message={<>سيُنشأ رصيد سنة {year + 1} لكل موظف نشط: الاستحقاق من ملفه، والمرحّل = المتبقي بحد أقصى 10 أيام. ما يزيد على 10 لا يُرحَّل. يمكن تعديل أي رصيد بعدها، ويمكن إعادة الترحيل لتحديث الأرقام.</>} />
+    </div>
+  );
+}
+
+type View = 'mine' | 'review' | 'all' | 'calendar' | 'balances';
 export default function Leaves() {
   const auth = useAuth();
   const [sp, setSp] = useSearchParams();
@@ -206,7 +325,7 @@ export default function Leaves() {
   const types = useOptions('leave_types', { sort: 'name' });
   const emp = auth.me?.employee?.id;
   const reviewer = auth.can('leave.recommend') || auth.can('leave.approve');
-  const [view, setView] = useState<View>(reviewer ? 'review' : 'mine');
+  const [view, setView] = useState<View>(sp.get('tab') === 'balances' ? 'balances' : reviewer ? 'review' : 'mine');
   const [creating, setCreating] = useState(false);
   const openId = sp.get('id');
   const open = (id: string | null) => { const n = new URLSearchParams(sp); if (id) n.set('id', id); else n.delete('id'); setSp(n, { replace: true }); };
@@ -225,8 +344,9 @@ export default function Leaves() {
         ...(reviewer ? [{ value: 'review' as View, label: 'بانتظار المراجعة' }] : []),
         ...(auth.isManager ? [{ value: 'all' as View, label: 'كل الطلبات' }] : []),
         { value: 'calendar', label: 'التقويم' },
+        { value: 'balances', label: auth.isManager || auth.isReportOnly ? 'أرصدة الإجازة السنوية' : 'رصيدي' },
       ]} />
-      {view === 'calendar' ? <LeaveCalendar onOpen={open} /> : (
+      {view === 'balances' ? <LeaveBalances /> : view === 'calendar' ? <LeaveCalendar onOpen={open} /> : (
         <DataTable resource="leave_requests" defaultSort="-created_at" baseFilters={base} archivedToggle={auth.isManager}
           searchPlaceholder="ابحث باسم الموظف أو رقمه أو الموقع…"
           filters={[

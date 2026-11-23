@@ -200,3 +200,9 @@ begin
 
   update system_settings set value = '"منظومة إدارة وتمكين فريق التشغيل"' where key = 'platform_name';
 end $$;
+
+-- spread demo employees over the rotation groups A/B/C/D
+update employees e set group_id = g.id
+from (select id, row_number() over (order by employee_number) rn from employees where is_demo and group_id is null) x,
+     (select id, row_number() over (order by code) - 1 idx from shift_groups) g
+where e.id = x.id and g.idx = (x.rn - 1) % 4;

@@ -1,6 +1,6 @@
 import {
   Bell, BookOpenCheck, Building2, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, FileBarChart, GaugeCircle, GraduationCap,
-  History, Lightbulb, Settings, ShieldCheck, Star, UserCircle2, Users,
+  History, Lightbulb, Repeat, Settings, ShieldCheck, Star, UserCircle2, Users,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { useAuth } from '@/lib/auth';
@@ -20,6 +20,7 @@ export const NAV: NavGroup[] = [
     { to: '/employees', label: 'الموظفون', icon: <Users className={ic} />, allow: (a) => a.isManager },
     { to: '/me', label: 'ملفي الشخصي', icon: <UserCircle2 className={ic} />, allow: (a) => !!a.me?.employee },
     { to: '/sites', label: 'المواقع والمحطات والخزانات', icon: <Building2 className={ic} />, allow: (a) => a.isManager },
+    { to: '/rotation', label: 'المناوبات والطلبات', icon: <Repeat className={ic} />, allow: operational },
     { to: '/shifts', label: 'الورديات والتغطية', icon: <CalendarClock className={ic} />, allow: operational },
   ] },
   { label: 'التشغيل', items: [

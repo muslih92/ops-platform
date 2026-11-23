@@ -15,6 +15,8 @@ export function startJobs() {
   const tick = async () => {
     await run('recurring tasks', 'select app.spawn_recurring_tasks()');
     await run('reminders', 'select app.generate_reminders()');
+    await run('group transfers applied', 'select app.apply_group_transfers()');
+    await run('leave balance alerts', 'select app.leave_balance_alerts()');
     await pool.query('delete from sessions where expires_at < now()').catch(() => {});
   };
   setTimeout(tick, 5000);
