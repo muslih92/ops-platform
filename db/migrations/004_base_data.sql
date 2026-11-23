@@ -50,7 +50,7 @@ insert into system_settings(key, value) values
   ('platform_name', '"منظومة إدارة وتمكين فريق التشغيل"'),
   ('platform_name_en', '"Operations Workforce Management & Development Platform"'),
   ('logo_path', 'null'),
-  ('org_name', '"إدارة تشغيل أنظمة نقل المياه"'),
+  ('org_name', '""'),
   ('org_info', '{"address": "", "phone": "", "email": "", "website": ""}'),
   ('default_timezone', '"Asia/Riyadh"'),
   ('default_language', '"ar"'),
