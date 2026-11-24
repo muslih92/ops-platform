@@ -297,15 +297,15 @@ function LeaveBalances() {
           </table>
         )}
         <div className="border-t border-border p-3 text-xs text-muted">
-          المتبقي = الاستحقاق (30 أو 33) + المرحّل من السنة السابقة (حد أقصى 10) + التسوية − الإجازات الاعتيادية المعتمدة في السنة (بالأيام التقويمية).
+          المتبقي = الاستحقاق السنوي + المرحّل من السنة السابقة (حد أقصى 10) + التسوية − الإجازات الاعتيادية المعتمدة في السنة (بالأيام التقويمية).
           «تقديري» يعني أن رصيد السنة لم يُدخل بعد، فيُحسب من استحقاق الموظف فقط. التنبيهات الشهرية من أكتوبر تُرسل للأرصدة المُدخلة فقط.
         </div>
       </div>
       <FormModal open={!!editing} onClose={() => setEditing(null)} title={`رصيد ${editing?.full_name ?? ''} لسنة ${year}`}
-        initial={editing ? { entitlement: String(editing.entitlement), carried_over: Number(editing.carried_over), adjustment: Number(editing.adjustment) } : null}
+        initial={editing ? { entitlement: Number(editing.entitlement), carried_over: Number(editing.carried_over), adjustment: Number(editing.adjustment) } : null}
         onSubmit={(p) => save.mutateAsync(p)}
         fields={[
-          { name: 'entitlement', label: 'الاستحقاق السنوي', type: 'select', required: true, options: [{ value: '30', label: '30 يومًا' }, { value: '33', label: '33 يومًا' }] },
+          { name: 'entitlement', label: 'الاستحقاق السنوي (بالأيام)', type: 'number', required: true, min: 0, max: 60 },
           { name: 'carried_over', label: 'المرحّل من السنة السابقة', type: 'number', min: 0, max: 10, hint: 'الحد الأقصى 10 أيام' },
           { name: 'adjustment', label: 'تسوية (+ أو −)', type: 'number', min: -60, max: 60, hint: 'مثل أيام مستخدمة قبل بدء العمل بالمنصة (بالسالب)' },
           { name: 'notes', label: 'ملاحظات', type: 'textarea' },

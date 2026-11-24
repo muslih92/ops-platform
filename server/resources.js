@@ -37,7 +37,7 @@ export const resources = {
     table: 'employees', view: 'v_employees',
     write: ['employee_number', 'full_name', 'job_title', 'department_id', 'primary_site_id', 'line_id', 'shift_id', 'manager_id', 'hire_date',
       'status', 'qualifications', 'certifications', 'previous_experience', 'strengths', 'interests', 'desired_skills', 'capabilities',
-      'specialization_wishes', 'supervisor_recommendation', 'group_id', 'annual_leave_days'],
+      'specialization_wishes', 'supervisor_recommendation', 'group_id', 'annual_leave_days', 'manager_text'],
     search: ['full_name', 'employee_number', 'site_name', 'job_title'], filters: ['primary_site_id', 'shift_id', 'line_id', 'status', 'department_id', 'id', 'is_demo', 'group_id'],
     sort: ['full_name', 'employee_number', 'site_name', 'shift_name', 'hire_date', 'status', 'group_code'], defaultSort: 'employee_number', archivable: true,
   },
