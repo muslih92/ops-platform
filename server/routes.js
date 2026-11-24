@@ -51,6 +51,7 @@ const RPC = {
   rotation_decide: { args: ['kind:text', 'id:uuid', 'decision:rotation_status', 'note:text'], returns: 'scalar' },
   leave_balance_report: { args: ['year:int', 'site_id:uuid'], returns: 'rows' },
   close_leave_year: { args: ['year:int'], returns: 'scalar' },
+  resolve_employee_refs: { args: ['refs:jsonb'], returns: 'scalar' },
 };
 
 api.post('/rpc/:fn', async (req, res, next) => {

@@ -12,18 +12,18 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { FormModal, type FieldDef } from '@/components/EntityForm';
 import { Alert, Badge, Button, DemoBadge, Modal, PageHeader } from '@/components/ui';
 
-export function employeeFields(o: { sites: any[]; lines: any[]; shifts: any[]; depts: any[]; managers: any[]; groups: any[] }): FieldDef[] {
+export function employeeFields(o: { groups: any[] }): FieldDef[] {
   return [
     { name: 'employee_number', label: 'الرقم الوظيفي', required: true, maxLength: 40 },
     { name: 'full_name', label: 'الاسم الكامل', required: true, maxLength: 150 },
     { name: 'job_title', label: 'المسمى الوظيفي', maxLength: 150 },
-    { name: 'department_id', label: 'الإدارة / القسم', type: 'select', options: o.depts },
-    { name: 'primary_site_id', label: 'الموقع الأساسي', type: 'select', options: o.sites, required: true },
-    { name: 'line_id', label: 'الخط', type: 'select', options: o.lines },
-    { name: 'shift_id', label: 'الوردية', type: 'select', options: o.shifts },
+    { name: 'department', label: 'الإدارة / القسم', maxLength: 150, placeholder: 'مثل: التشغيل أو الصيانة' },
+    { name: 'site', label: 'الموقع الأساسي', required: true, maxLength: 150, hint: 'اكتب اسم الموقع، ويُضاف تلقائيًا إن لم يكن موجودًا' },
+    { name: 'line', label: 'الخط', maxLength: 150 },
+    { name: 'shift', label: 'الوردية', maxLength: 100 },
     { name: 'group_id', label: 'مجموعة المناوبة (A/B/C/D)', type: 'select', options: o.groups, hint: 'للنقل لاحقًا استخدم «طلب نقل» في صفحة المناوبات' },
-    { name: 'annual_leave_days', label: 'رصيد الإجازة السنوي', type: 'select', required: true, options: [{ value: '30', label: '30 يومًا' }, { value: '33', label: '33 يومًا' }] },
-    { name: 'manager_id', label: 'المدير المباشر', type: 'select', options: o.managers },
+    { name: 'annual_leave_days', label: 'رصيد الإجازة السنوي (بالأيام)', type: 'number', required: true, min: 0, max: 60 },
+    { name: 'manager', label: 'المدير المباشر', maxLength: 150, hint: 'إن طابق اسم أو رقم موظف مسجل يُربط به' },
     { name: 'hire_date', label: 'تاريخ التعيين', type: 'date' },
     { name: 'status', label: 'الحالة الوظيفية', type: 'select', options: options('employee_status'), required: true },
     { name: 'qualifications', label: 'المؤهلات', type: 'textarea' },
@@ -32,21 +32,19 @@ export function employeeFields(o: { sites: any[]; lines: any[]; shifts: any[]; d
   ];
 }
 
-export function useEmployeeFieldOptions(siteId?: string) {
-  const sites = useSites();
-  const lines = useOptions('lines', { label: (r) => `${r.name} – ${r.site_name}`, sort: 'code' });
-  const shifts = useOptions('shifts', { label: (r) => `${r.name} – ${r.site_name || 'عام'}`, sort: 'site_name' });
-  const depts = useOptions('departments');
-  const managers = useOptions('employee_directory', { label: (r) => `${r.full_name} – ${r.employee_number}`, sort: 'full_name' });
+export function useEmployeeFieldOptions() {
   const groups = useOptions('shift_groups', { label: (r) => r.name, sort: 'code' });
-  return {
-    groups: groups.options,
-    sites: sites.options,
-    lines: siteId ? lines.options.filter((_, i) => lines.rows[i].site_id === siteId) : lines.options,
-    shifts: siteId ? shifts.options.filter((_, i) => !shifts.rows[i].site_id || shifts.rows[i].site_id === siteId) : shifts.options,
-    depts: depts.options,
-    managers: managers.options,
-  };
+  return { groups: groups.options };
+}
+
+/** Form values for an existing employee (typed names instead of ids). */
+export const employeeToForm = (e: any) => ({ ...e, department: e.department_name, site: e.site_name, line: e.line_name, shift: e.shift_name, manager: e.manager_name });
+
+/** Turn typed names into linked records (found by name or created) before saving. */
+export async function employeePayload(p: Record<string, any>) {
+  const { department, site, line, shift, manager, ...rest } = p;
+  const refs = await api.rpc<Record<string, any>>('resolve_employee_refs', { refs: { department, site, line, shift, manager } });
+  return { ...rest, ...refs };
 }
 
 const EXPORT_COLS: ExportCol<any>[] = [
@@ -74,10 +72,9 @@ export default function Employees() {
   const skills = useOptions('skills', { sort: 'domain_order' });
   const [skillFilter, setSkillFilter] = useState('');
   const skillEmp = useOptions('employee_skills', { value: 'employee_id', filters: { skill_id: skillFilter, level: '3,4' }, enabled: !!skillFilter });
-  const [siteForForm, setSiteForForm] = useState<string>();
-  const fo = useEmployeeFieldOptions(siteForForm);
+  const fo = useEmployeeFieldOptions();
   const canWrite = auth.can('employees.manage');
-  const create = useAction((p: any) => api.create('employees', p), { success: 'تمت إضافة الموظف', onSuccess: (r: any) => nav(`/employees/${r.id}`) });
+  const create = useAction(async (p: any) => api.create('employees', await employeePayload(p)), { success: 'تمت إضافة الموظف', onSuccess: (r: any) => nav(`/employees/${r.id}`) });
 
   const cols: Column<any>[] = [
     { key: 'full_name', header: 'الاسم', sortKey: 'full_name', mobile: 'title', render: (r) => <span className="font-medium">{r.full_name} <DemoBadge show={r.is_demo} /></span> },
@@ -130,10 +127,8 @@ export default function Employees() {
         empty={{ title: 'لا يوجد موظفون بعد', description: 'أضف موظفًا أو استورد قائمة من ملف Excel/CSV.', action: canWrite ? <Button onClick={() => setCreating(true)}>إضافة موظف</Button> : undefined }} />
 
       <FormModal open={creating} onClose={() => setCreating(false)} title="إضافة موظف" size="lg"
-        fields={employeeFields(fo)} initial={{ status: 'active', annual_leave_days: '30' }}
-        onSubmit={(p) => create.mutateAsync(p)}>
-        {(v) => { if (v.primary_site_id !== siteForForm) setTimeout(() => setSiteForForm(v.primary_site_id || undefined)); return null; }}
-      </FormModal>
+        fields={employeeFields(fo)} initial={{ status: 'active', annual_leave_days: 30 }}
+        onSubmit={(p) => create.mutateAsync(p)} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );

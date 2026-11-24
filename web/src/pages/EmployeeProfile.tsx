@@ -10,7 +10,7 @@ import { Alert, Badge, Button, Card, Checkbox, DemoBadge, EmptyState, ErrorState
 import { FormModal } from '@/components/EntityForm';
 import { Attachments } from '@/components/Attachments';
 import { Criticality, IdeaStatus, LeaveStatus, PlanStatus, Priority, SkillLevel, TaskStatus } from '@/components/StatusBadges';
-import { employeeFields, useEmployeeFieldOptions } from './Employees';
+import { employeeFields, employeePayload, employeeToForm, useEmployeeFieldOptions } from './Employees';
 
 type Tab = 'info' | 'skills' | 'strengths' | 'tasks' | 'development' | 'leaves' | 'reviews' | 'files';
 
@@ -53,10 +53,10 @@ function InfoTab({ e, canEdit }: { e: any; canEdit: boolean }) {
   const auth = useAuth();
   const [edit, setEdit] = useState(false);
   const [editPriv, setEditPriv] = useState(false);
-  const fo = useEmployeeFieldOptions(e.primary_site_id);
+  const fo = useEmployeeFieldOptions();
   const priv = useList('employee_private', { filters: { employee_id: e.id } });
   const p = priv.data?.rows?.[0];
-  const save = useAction((v: any) => api.update('employees', e.id, v), { success: 'تم حفظ بيانات الموظف' });
+  const save = useAction(async (v: any) => api.update('employees', e.id, await employeePayload(v)), { success: 'تم حفظ بيانات الموظف' });
   const savePriv = useAction((v: any) => (p ? api.update('employee_private', e.id, v) : api.create('employee_private', { ...v, employee_id: e.id })), { success: 'تم حفظ بيانات الاتصال' });
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -91,7 +91,7 @@ function InfoTab({ e, canEdit }: { e: any; canEdit: boolean }) {
           </dl>
         )}
       </Card>
-      <FormModal open={edit} onClose={() => setEdit(false)} title="تعديل بيانات الموظف" size="lg" fields={employeeFields(fo)} initial={e} onSubmit={(v) => save.mutateAsync(v)} />
+      <FormModal open={edit} onClose={() => setEdit(false)} title="تعديل بيانات الموظف" size="lg" fields={employeeFields(fo)} initial={employeeToForm(e)} onSubmit={(v) => save.mutateAsync(v)} />
       <FormModal open={editPriv} onClose={() => setEditPriv(false)} title="بيانات الاتصال" initial={p}
         fields={[{ name: 'phone', label: 'رقم التواصل', type: 'tel' }, { name: 'email', label: 'البريد الإلكتروني', type: 'email' }, { name: 'admin_notes', label: 'ملاحظات إدارية (لا تظهر للموظف إلا ضمن ملفه)', type: 'textarea' }]}
         onSubmit={(v) => savePriv.mutateAsync(v)} />
