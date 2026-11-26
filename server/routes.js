@@ -52,6 +52,7 @@ const RPC = {
   leave_balance_report: { args: ['year:int', 'site_id:uuid'], returns: 'rows' },
   close_leave_year: { args: ['year:int'], returns: 'scalar' },
   resolve_employee_refs: { args: ['refs:jsonb'], returns: 'scalar' },
+  rotation_dashboard: { args: ['site_id:uuid'], returns: 'scalar' },
 };
 
 api.post('/rpc/:fn', async (req, res, next) => {

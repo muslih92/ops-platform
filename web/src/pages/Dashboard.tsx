@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Clock, GaugeCircle, GraduationCap, Hourglass, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Moon, Sun, Timer, Wallet, CheckCircle2, ClipboardList, Clock, GaugeCircle, GraduationCap, Hourglass, ShieldAlert, Users } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useOptions, useRpc, useSites } from '@/lib/hooks';
-import { fmtDate, fmtDateTime, fmtTime, todayISO } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtTime, fmtWeekday, todayISO } from '@/lib/format';
 import { label } from '@/lib/i18n';
 import { Alert, Badge, Card, EmptyState, ErrorState, Input, PageHeader, Select, Skeleton, StatCard } from '@/components/ui';
 import { HBarChart, ORDINAL_BLUE, SERIES } from '@/components/Charts';
@@ -55,6 +55,8 @@ export default function Dashboard() {
             <StatCard label={personal ? 'طلباتي بانتظار القرار' : 'إجازات بانتظار المراجعة'} value={d.leaves_pending} icon={<CalendarDays className="h-5 w-5" />} tone={d.leaves_pending ? 'warning' : 'neutral'} hint={`في إجازة اليوم: ${d.leaves_current}`} onClick={() => nav('/leaves')} />
             <StatCard label="ملاحظات تسليم مفتوحة" value={d.handover_open} icon={<ShieldAlert className="h-5 w-5" />} tone={d.handover_open ? 'warning' : 'neutral'} onClick={() => nav('/handover')} />
           </div>
+
+          <RotationPanel site={site || null} personal={personal} />
 
           {!personal && (
             <div className="grid gap-4 xl:grid-cols-2">
@@ -170,4 +172,78 @@ export function eventText(e: { event_type: string; to_status?: string; note?: st
     case 'archived': return 'أُرشفت المهمة';
     default: return e.event_type;
   }
+}
+
+const DAYS = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
+const shortDay = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return `${DAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d}`; };
+
+/** Rotation groups, pending requests, overtime and leave balances (rules section). */
+function RotationPanel({ site, personal }: { site: string | null; personal: boolean }) {
+  const nav = useNavigate();
+  const q = useRpc<any>('rotation_dashboard', { site_id: site });
+  const r = q.data;
+  if (!r) return <Skeleton className="h-40" />;
+  const pend = r.pending;
+  const pendTotal = pend.swaps + pend.coverage + pend.transfers + pend.overtime;
+  const otTotal = r.overtime_month.reduce((a: number, x: any) => a + Number(x.hours), 0);
+  const shiftCard = (k: 'D' | 'N') => {
+    const t = r.today.find((x: any) => x.kind === k);
+    return (
+      <div className={`rounded-lg border p-3 ${k === 'D' ? 'border-warning/40 bg-warning-soft' : 'border-accent/40 bg-accent/10'}`}>
+        <div className="flex items-center gap-2 text-sm font-semibold text-fg">{k === 'D' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}الوردية {k === 'D' ? 'النهارية' : 'الليلية'} اليوم</div>
+        <div className="mt-1 text-2xl font-bold text-fg">المجموعة {t?.group ?? '—'}</div>
+        <div className="mt-1 text-xs text-muted">حاضر <b className="num text-fg">{t?.present ?? 0}</b> من <span className="num">{t?.total ?? 0}</span>
+          {t?.absent ? <> · إجازة <b className="num text-danger">{t.absent}</b></> : null}{t?.covering ? <> · تغطية <b className="num">{t.covering}</b></> : null}</div>
+      </div>
+    );
+  };
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card title="المناوبات اليوم" actions={<Link to="/rotation" className="text-sm text-accent hover:underline">الجدول</Link>}>
+          <div className="grid grid-cols-2 gap-2">{shiftCard('D')}{shiftCard('N')}</div>
+          <div className="mt-3 grid grid-cols-8 gap-1 text-center text-xs">
+            <div />{r.next_days.map((x: any) => <div key={x.day} className="text-muted" title={fmtDate(x.day)}>{shortDay(x.day)}</div>)}
+            <div className="flex justify-center"><Sun className="h-3.5 w-3.5" /></div>{r.next_days.map((x: any) => <div key={x.day} className="rounded bg-warning-soft py-1 font-semibold text-warning">{x.D}</div>)}
+            <div className="flex justify-center"><Moon className="h-3.5 w-3.5" /></div>{r.next_days.map((x: any) => <div key={x.day} className="rounded bg-accent/10 py-1 font-semibold text-accent">{x.N}</div>)}
+          </div>
+        </Card>
+        <Card title="طلبات بانتظار الاعتماد" actions={<Link to="/rotation?tab=swaps" className="text-sm text-accent hover:underline">عرض</Link>}>
+          {pendTotal === 0 ? <EmptyState title="لا توجد طلبات معلقة" /> : (
+            <div className="grid grid-cols-2 gap-2">
+              {[['swaps', 'تبديل ورديات'], ['coverage', 'تغطية'], ['transfers', 'نقل موظفين'], ['overtime', 'عمل إضافي']].map(([k, l]) => (
+                <button key={k} onClick={() => nav(`/rotation?tab=${k}`)} className="rounded-lg border border-border p-3 text-start hover:bg-surface-2">
+                  <div className={`num text-2xl font-bold ${pend[k] ? 'text-warning' : 'text-muted'}`}>{pend[k]}</div><div className="text-xs text-muted">{l}</div>
+                </button>))}
+            </div>)}
+        </Card>
+        <Card title="العمل الإضافي هذا الشهر" actions={<Link to="/rotation?tab=overtime" className="text-sm text-accent hover:underline">السجل</Link>}>
+          <div className="mb-2 flex items-center gap-2"><Timer className="h-5 w-5 text-muted" /><span className="num text-2xl font-bold">{otTotal}</span><span className="text-sm text-muted">ساعة معتمدة</span></div>
+          {r.overtime_month.length === 0 ? <EmptyState title="لا يوجد عمل إضافي معتمد هذا الشهر" /> : (
+            <ul className="space-y-2">{r.overtime_month.map((x: any) => (
+              <li key={x.cause} className="text-sm">
+                <div className="flex justify-between"><span>{label('overtime_cause', x.cause)}</span><span className="num font-semibold">{Number(x.hours)} ساعة</span></div>
+                <div className="mt-1 h-2 rounded bg-surface-2"><div className="h-2 rounded" style={{ width: `${(Number(x.hours) / otTotal) * 100}%`, background: SERIES[1] }} /></div>
+              </li>))}</ul>)}
+          {!personal && r.overtime_top.length > 0 && <div className="mt-2 text-xs text-muted">الأعلى: {r.overtime_top.slice(0, 3).map((x: any) => `${x.name} (${x.hours})`).join('، ')}</div>}
+        </Card>
+      </div>
+      <Card title={personal ? 'رصيد إجازتي السنوية' : 'أرصدة الإجازة السنوية وحد الترحيل (10 أيام)'} actions={<Link to="/leaves?tab=balances" className="text-sm text-accent hover:underline">التفاصيل</Link>}>
+        {r.leave.above_cap > 0 && r.year_end_alert && <Alert tone="danger" className="mb-3" title="اقتربت نهاية السنة">{personal ? 'رصيدك يتجاوز 10 أيام، وما زاد لن يُرحَّل. خطط لإجازتك.' : `${r.leave.above_cap} موظف رصيدهم أكثر من 10 أيام، والزائد لن يُرحَّل.`}</Alert>}
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 md:col-span-1">
+            <StatCard label="فوق حد الترحيل" value={r.leave.above_cap} icon={<Wallet className="h-5 w-5" />} tone={r.leave.above_cap ? 'danger' : 'success'} onClick={() => nav('/leaves?tab=balances')} />
+            <StatCard label="أيام لن تُرحَّل" value={Number(r.leave.above_cap_days)} tone={r.leave.above_cap_days ? 'warning' : 'neutral'} hint={`أرصدة مُدخلة: ${r.leave.entered} من ${r.leave.employees}`} />
+          </div>
+          <div className="md:col-span-2">
+            {r.leave.top.length === 0 ? <EmptyState title={personal ? 'رصيدك ضمن حد الترحيل' : 'لا أحد فوق حد الترحيل'} /> : (
+              <ul className="divide-y divide-border rounded-lg border border-border">{r.leave.top.map((x: any) => (
+                <li key={x.name} className="flex items-center gap-2 px-3 py-2 text-sm"><span className="flex-1 font-medium">{x.name}</span>
+                  <span className="text-xs text-muted">المتبقي <b className="num text-fg">{Number(x.remaining)}</b></span>
+                  <Badge tone="danger">+{Number(x.above)} فوق الحد</Badge></li>))}</ul>)}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
 }
