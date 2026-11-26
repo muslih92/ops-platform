@@ -206,3 +206,79 @@ update employees e set group_id = g.id
 from (select id, row_number() over (order by employee_number) rn from employees where is_demo and group_id is null) x,
      (select id, row_number() over (order by code) - 1 idx from shift_groups) g
 where e.id = x.id and g.idx = (x.rn - 1) % 4;
+
+-- ---------------------------------------------------------------------
+-- Demo: rotation requests, overtime, leaves and balances (relative to today)
+-- ---------------------------------------------------------------------
+do $$
+declare
+  ga uuid := (select id from shift_groups where code = 'A'); gb uuid := (select id from shift_groups where code = 'B');
+  gc uuid := (select id from shift_groups where code = 'C'); gd uuid := (select id from shift_groups where code = 'D');
+  d date; a1 date; b1 date; e uuid[]; today_d uuid; today_n uuid; i int;
+begin
+  if not exists (select 1 from employees where is_demo) then return; end if;
+  select array_agg(id order by employee_number) into e from employees where is_demo;
+  today_d := (select id from shift_groups where app.group_shift(id, current_date) = 'D' limit 1);
+  today_n := (select id from shift_groups where app.group_shift(id, current_date) = 'N' limit 1);
+
+  -- approved swap A <-> B (A's next 2 working days that B is off, and B's following 2 days that A is off)
+  d := current_date + 1;
+  while not (app.group_shift(ga, d) <> 'O' and app.group_shift(gb, d) = 'O' and app.group_shift(ga, d + 1) = app.group_shift(ga, d) and app.group_shift(gb, d + 1) = 'O') loop d := d + 1; end loop;
+  a1 := d; d := a1 + 2;
+  while not (app.group_shift(gb, d) <> 'O' and app.group_shift(ga, d) = 'O' and app.group_shift(gb, d + 1) = app.group_shift(gb, d) and app.group_shift(ga, d + 1) = 'O') loop d := d + 1; end loop;
+  b1 := d;
+  insert into shift_swaps(group_a_id, group_b_id, a_start, a_end, b_start, b_end, reason, status, decision_note, decided_at, is_demo)
+  values (ga, gb, a1, a1 + 1, b1, b1 + 1, 'مناسبة عائلية لأغلب أفراد المجموعة A (تجريبي)', 'approved', 'موافق، التبديل متوازن', now(), true);
+
+  -- pending swap C <-> D
+  d := current_date + 1;
+  while not (app.group_shift(gc, d) <> 'O' and app.group_shift(gd, d) = 'O' and app.group_shift(gc, d + 1) = app.group_shift(gc, d) and app.group_shift(gd, d + 1) = 'O') loop d := d + 1; end loop;
+  insert into shift_swaps(group_a_id, group_b_id, a_start, a_end, reason, is_demo)
+  values (gc, gd, d, d + 1, 'دورة تدريبية لعدد من أفراد المجموعة C (تجريبي)', true);
+
+  -- annual leave today for two members of today's day group, one of the night group
+  insert into leave_requests(employee_id, leave_type_id, start_date, end_date, status, decision_reason, decided_at, notes, is_demo)
+  select x.id, (select id from leave_types where code = 'ANNUAL'), current_date - 2, current_date + 5, 'approved', 'معتمد (تجريبي)', now(), 'إجازة سنوية (تجريبي)', true
+  from (select id from employees where is_demo and group_id = today_d order by employee_number limit 2) x;
+  insert into leave_requests(employee_id, leave_type_id, start_date, end_date, status, decision_reason, decided_at, is_demo)
+  select x.id, (select id from leave_types where code = 'ANNUAL'), current_date, current_date + 3, 'approved', 'معتمد (تجريبي)', now(), true
+  from (select id from employees where is_demo and group_id = today_n order by employee_number limit 1) x;
+
+  -- coverage: approved overtime today (off-duty member covers a day-shift absentee), pending one, approved day compensation
+  insert into coverage_requests(work_date, shift_kind, absent_employee_id, covering_employee_id, method, hours, reason, status, decided_at, is_demo)
+  select current_date, 'D', (select id from employees where is_demo and group_id = today_d order by employee_number limit 1),
+         (select id from employees where is_demo and group_id not in (today_d, today_n) order by employee_number limit 1),
+         'overtime', 12, 'تغطية إجازة سنوية (تجريبي)', 'approved', now(), true;
+  insert into coverage_requests(work_date, shift_kind, absent_employee_id, covering_employee_id, method, comp_days, reason, status, decided_at, is_demo)
+  select current_date, 'N', (select id from employees where is_demo and group_id = today_n order by employee_number limit 1),
+         (select id from employees where is_demo and group_id not in (today_d, today_n) order by employee_number offset 1 limit 1),
+         'day_compensation', 1, 'تغطية إجازة (تجريبي)', 'approved', now(), true;
+  insert into coverage_requests(work_date, shift_kind, covering_employee_id, method, hours, reason, is_demo)
+  select current_date + 3, 'N', (select id from employees where is_demo and group_id not in (today_d, today_n) order by employee_number offset 2 limit 1),
+         'overtime', 12, 'نقص في الوردية الليلية (تجريبي)', true;
+
+  -- overtime log this month: breakdowns, pipe bursts, emergencies
+  for i in 1..9 loop
+    insert into overtime_entries(employee_id, work_date, hours, cause, site_id, description, reference_no, status, decided_at, is_demo)
+    values (e[1 + (i * 5) % array_length(e, 1)], greatest(date_trunc('month', current_date)::date, current_date - i * 2), (array[4, 6, 8, 3, 5, 10, 6, 4, 7])[i],
+            (array['pipe_burst','breakdown','pipe_burst','breakdown','emergency','pipe_burst','planned_work','breakdown','pipe_burst'])[i]::overtime_cause,
+            (select primary_site_id from employees where id = e[1 + (i * 5) % array_length(e, 1)]),
+            (array['انكسار خط رئيسي وإصلاحه','عطل مضخة رقم 2','تسرب في خط التغذية','عطل صمام تحكم','انقطاع كهرباء طارئ','انكسار خط فرعي','صيانة مجدولة لخزان','عطل حساس ضغط','انكسار وصلة'])[i] || ' (تجريبي)',
+            'DEMO-' || (4100 + i), case when i = 9 then 'pending' else 'approved' end::rotation_status, case when i = 9 then null else now() end, true);
+  end loop;
+
+  -- transfers: approved temporary, pending permanent
+  insert into group_transfers(employee_id, to_group_id, kind, start_date, end_date, reason, status, decided_at, is_demo)
+  select e[5], (select id from shift_groups where id <> (select group_id from employees where id = e[5]) order by code limit 1),
+         'temporary', current_date - 1, current_date + 10, 'دعم مجموعة بها نقص (تجريبي)', 'approved', now(), true;
+  insert into group_transfers(employee_id, to_group_id, kind, start_date, reason, is_demo)
+  select e[9], (select id from shift_groups where id <> (select group_id from employees where id = e[9]) order by code desc limit 1),
+         'permanent', current_date + 14, 'طلب الموظف لظروف السكن (تجريبي)', true;
+
+  -- leave balances for the current year (varied, some above the 10-day carry-over cap)
+  insert into leave_balances(employee_id, year, entitlement, carried_over, adjustment, notes)
+  select id, extract(year from current_date)::int, case when rn % 4 = 0 then 33 else 30 end, (rn * 3) % 11,
+         -(12 + (rn * 7) % 25), 'رصيد تجريبي'
+  from (select id, row_number() over (order by employee_number) rn from employees where is_demo) x
+  on conflict (employee_id, year) do nothing;
+end $$;
